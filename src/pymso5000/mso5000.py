@@ -325,6 +325,38 @@ class MSO5000(oscilloscope.Oscilloscope):
 
         raise CommunicationError_ProtocolViolation(f"Unknown response for timebase scale: {resp}")
 
+    def _set_channel_coupling(self, channel, mode):
+        if (channel < 0) or (channel > 3):
+            raise ValueError(f"Supplied channel number {channel} is out of bounds")
+
+        modestr = {
+            oscilloscope.OscilloscopeCouplingMode.DC  : "DC",
+            oscilloscope.OscilloscopeCouplingMode.AC  : "AC",
+            oscilloscope.OscilloscopeCouplingMode.GND : "GND"
+        }
+
+        if mode not in modestr:
+            raise ValueError(f"Unsupported coupling mode {mode}")
+
+        self._scpi_command_noreply(f":CHAN{channel+1}:COUP {modestr[mode]}")
+
+    def _get_channel_coupling(self, channel):
+        if (channel < 0) or (channel > 3):
+            raise ValueError(f"Supplied channel number {channel} is out of bounds")
+
+        resp = self._scpi_command(f":CHAN{channel+1}:COUP?")
+
+        modes = {
+            "DC"   : oscilloscope.OscilloscopeCouplingMode.DC,
+            "AC"   : oscilloscope.OscilloscopeCouplingMode.AC,
+            "GND"  : oscilloscope.OscilloscopeCouplingMode.GND
+        }
+        if resp in modes:
+            return modes[resp]
+        else:
+            raise CommunicationError_ProtocolViolation(f"Unknown coupling mode {resp} received from device")
+
+
 if __name__ == "__main__":
     with MSO5000(address = "10.0.0.122") as mso:
         print(f"Identify: {mso.identify()}")
