@@ -57,6 +57,8 @@ class MSO5000(oscilloscope.Oscilloscope):
         self._address = address
         self._port = port
 
+        self._probe_ratios = [ 1, 1, 1, 1 ]
+
         atexit.register(self.__close)
 
     # Connection handling
@@ -355,6 +357,29 @@ class MSO5000(oscilloscope.Oscilloscope):
             return modes[resp]
         else:
             raise CommunicationError_ProtocolViolation(f"Unknown coupling mode {resp} received from device")
+
+    def _set_channel_probe_ratio(self, channel, ratio):
+        if (channel < 0) or (channel >= self._nchannels):
+            raise ValueError(f"Channel index {channel} is out of bounds")
+        if ratio not in [ 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000 ]:
+            raise ValueError(f"Ratio {ratio} is not supported by this device")
+
+        self._probe_ratios[channel] = ratio
+        self._scpi_command_noreply(f":CHAN{channel+1}:PROB {ratio}")
+
+    def _get_channel_probe_ratio(self, channel):
+        if (channel < 0) or (channel > 3):
+            raise ValueError(f"Supplied channel number {channel} is out of bounds")
+        resp = self._scpi_command(f":CHAN{channel+1}:PROB?")
+
+        try:
+            resp = float(resp)
+        except:
+            return None
+
+        if resp not in [ 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000 ]:
+            raise CommunicationError_ProtocolViolation(f"Received unsupported probe ratio {resp}")
+        return resp
 
 
 if __name__ == "__main__":
