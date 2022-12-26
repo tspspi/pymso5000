@@ -17,7 +17,9 @@ class MSO5000(oscilloscope.Oscilloscope):
         self,
 
         address=None,
-        port=5555
+        port=5555,
+
+        useNumpy = False
     ):
         if not isinstance(address, str):
             raise ValueError(f"Address {address} is invalid")
@@ -58,6 +60,8 @@ class MSO5000(oscilloscope.Oscilloscope):
         self._port = port
 
         self._probe_ratios = [ 1, 1, 1, 1 ]
+
+        self._use_numpy = useNumpy
 
         atexit.register(self.__close)
 
@@ -381,6 +385,117 @@ class MSO5000(oscilloscope.Oscilloscope):
             raise CommunicationError_ProtocolViolation(f"Received unsupported probe ratio {resp}")
         return resp
 
+
+
+    def _waveform_get_xscale(self):
+        xinc = self._scpi_command(":WAV:XINC?")
+        if xinc is None:
+            raise CommunicationError_ProtocolViolation("Did not receive valid response to XINC")
+        xorigin = self._scpi_command(":WAV:XOR?")
+        if xorigin is None:
+            raise CommunicationError_ProtocolViolation("Did not receive valid response to XORIGIN")
+        xref = self._scpi_command(":WAV:XREF?")
+        if xref is None:
+            raise CommunicationError_ProtocolViolation("Did not receive valid response to XREF")
+
+        try:
+            xinc = float(xinc)
+            xorigin = float(xorigin)
+            xref = float(xref)
+        except:
+            raise CommunicationError_ProtocolViolation("Did not receive valid reply on XINC, XORIGIN or XREF")
+
+        # This is:
+        #	Interval between two neighboring points
+        #	Start time of currently selected point after trigger
+        #	Reference time (should be 0)
+        return xinc, xorigin, xref
+
+    def _waveform_get_yscale(self):
+        xinc = self._scpi_command(":WAV:YINC?")
+        if xinc is None:
+            raise CommunicationError_ProtocolViolation("Did not receive valid response to YINC")
+        xorigin = self._scpi_command(":WAV:YOR?")
+        if xorigin is None:
+            raise CommunicationError_ProtocolViolation("Did not receive valid response to YORIGIN")
+        xref = self._scpi_command(":WAV:YREF?")
+        if xref is None:
+            raise CommunicationError_ProtocolViolation("Did not receive valid response to YREF")
+
+        try:
+            xinc = float(xinc)
+            xorigin = float(xorigin)
+            xref = float(xref)
+        except:
+            raise CommunicationError_ProtocolViolation("Did not receive valid reply on YINC, YORIGIN or YREF")
+
+        # This is:
+        #	Interval between two neighboring points
+        #	Start time of currently selected point after trigger
+        #	Reference time (should be 0)
+        return xinc, xorigin, xref
+
+    def _query_waveform(self, channel)
+        if (channel < 0) or (channel > self._nchannels):
+            raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels}]")
+        self._scpi_command_noreply(f":WAV:SOUR CHAN{channel}")
+        self._scpi_command_noreply(f":WAV:MODE NORM")
+        self._scpi_command_noreply(f":WAV:FORM ASCII")
+        self._scpi_command_noreply(f":WAV:POIN 1000")
+        resppre = self._scpi_command(":WAV:PRE?")
+        respdata = self._scpi_command(":WAV:DATA?")
+
+        if (resppre is None) or (respdata is None):
+            raise CommunicationError_ProtocolViolation("Failed to query trace from MSO5000")
+
+        # Parse preamble ...
+        pre = resppre.split(",")
+        if len(pre) != 10:
+            raise CommunicationError_ProtocolViolation("Unknown preamble format")
+
+        if int(pre[0]) != 2:
+            raise CommunicationError_ProtocolViolation(f"Requested ASCII but received format {pre[0]}")
+        if int(pre[1]) != 0:
+            raise CommunicationError_ProtocolViolation(f"Requested NORMAL data but received {pre[1]}")
+        points = int(pre[2])
+        avgcount = int(pre[3])
+        xinc = float(pre[4])
+        xorigin = float(pre[5])
+        xref = float(pre[6])
+        yinc = float(pre[7])
+        yorigin = float(pre[8])
+        yref = float(pre[9])
+
+        # Parse data ...
+        if respdata[0:2] != '#9':
+            raise CommunicationError_ProtocolViolation("Trace data did not start with #9")
+        wavebytes = int(respdata[2:11])
+        wavedata = (respdata[11:wavebytes+11]).split(",")
+        wavedata = [ float(i) for i in wavedata[:-1] ]
+
+        # Build x axis ...
+        if self._use_numpy:
+            import numpy as np
+            xdata = np.arange(xorigin, xorigin + points * xinc, xinc)
+			ydata = np.asarray(wavedata)
+        else:
+            xdata = []
+            curx = xorigin
+            for i in range(points):
+                xdata.append(curx)
+                curx = curx + xinc
+            ydata = wavedata
+
+        # Return trace X and Y axis ...
+        #
+        # The baseclass might add some statistics later on to the same dictionary
+
+        res = {
+            'x' : xdata,
+            'y' : ydata
+        }
+
+        return res
 
 if __name__ == "__main__":
     with MSO5000(address = "10.0.0.122") as mso:
