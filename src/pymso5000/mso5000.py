@@ -436,6 +436,20 @@ class MSO5000(Oscilloscope):
         return xinc, xorigin, xref
 
     def _query_waveform(self, channel):
+        if isinstance(channel, list) or isinstance(channel, tuple):
+            resp = None
+
+            for ch in channel:
+                resp_next = self._query_waveform(ch)
+                if resp is None:
+                    resp = {
+                        'x' : resp_next['x'],
+                        f"y{ch}" : resp_next['y']
+                    }
+                else:
+                    resp[f"y{ch}"] = resp_next['y']
+            return resp
+
         if (channel < 0) or (channel > self._nchannels):
             raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels}]")
         self._scpi_command_noreply(f":WAV:SOUR CHAN{channel}")
@@ -501,10 +515,15 @@ if __name__ == "__main__":
     with MSO5000(address = "10.0.0.123", useNumpy = True) as mso:
         print(f"Identify: {mso.identify()}")
 
-        chr1 = mso._query_waveform(1)
+        mso._set_channel_enable(1, True)
+        mso._set_channel_enable(2, True)
+
+        data = mso._query_waveform((1, 2))
+        print(data)
 
         import matplotlib.pyplot as plt
-        plt.plot(chr1['x'], chr1['y'])
+        plt.plot(data['x'], data['y1'], label = "Ch1")
+        plt.plot(data['x'], data['y2'], label = "Ch2")
         plt.show()
 
         pass
