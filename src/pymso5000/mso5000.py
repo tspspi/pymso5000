@@ -1,8 +1,8 @@
-from exceptions import CommunicationError_ProtocolViolation
-from exceptions import CommunicationError_Timeout
-from exceptions import CommunicationError_NotConnected
+from labdevices.exceptions import CommunicationError_ProtocolViolation
+from labdevices.exceptions import CommunicationError_Timeout
+from labdevices.exceptions import CommunicationError_NotConnected
 
-import oscilloscope
+from labdevices.oscilloscope import Oscilloscope, OscilloscopeSweepMode, OscilloscopeTriggerMode, OscilloscopeTimebaseMode, OscilloscopeRunMode
 import atexit
 
 from time import sleep
@@ -12,7 +12,7 @@ import socket
 import logging
 import datetime
 
-class MSO5000(oscilloscope.Oscilloscope):
+class MSO5000(Oscilloscope):
     def __init__(
         self,
 
@@ -31,24 +31,24 @@ class MSO5000(oscilloscope.Oscilloscope):
         super().__init__(
             nChannels = 4,
             supportedSweepModes = [
-                oscilloscope.OscilloscopeSweepMode.AUTO,
-                oscilloscope.OscilloscopeSweepMode.NORMAL,
-                oscilloscope.OscilloscopeSweepMode.SINGLE
+                OscilloscopeSweepMode.AUTO,
+                OscilloscopeSweepMode.NORMAL,
+                OscilloscopeSweepMode.SINGLE
             ],
             supportedTriggerModes = [
-                oscilloscope.OscilloscopeTriggerMode.EDGE,
-                oscilloscope.OscilloscopeTriggerMode.PULSE,
-                oscilloscope.OscilloscopeTriggerMode.SLOPE
+                OscilloscopeTriggerMode.EDGE,
+                OscilloscopeTriggerMode.PULSE,
+                OscilloscopeTriggerMode.SLOPE
             ],
             supportedTimebaseModes = [
-                oscilloscope.OscilloscopeTimebaseMode.MAIN,
-                oscilloscope.OscilloscopeTimebaseMode.XY,
-                oscilloscope.OscilloscopeTimebaseMode.ROLL
+                OscilloscopeTimebaseMode.MAIN,
+                OscilloscopeTimebaseMode.XY,
+                OscilloscopeTimebaseMode.ROLL
             ],
             supportedRunModes = [
-                oscilloscope.OscilloscopeRunMode.STOP,
-                oscilloscope.OscilloscopeRunMode.RUN,
-                oscilloscope.OscilloscopeRunMode.SINGLE
+                OscilloscopeRunMode.STOP,
+                OscilloscopeRunMode.RUN,
+                OscilloscopeRunMode.SINGLE
             ],
             timebaseScale = (5e-9, 1000.0),
             triggerForceSupported = True
@@ -205,11 +205,11 @@ class MSO5000(oscilloscope.Oscilloscope):
         raise CommunicationError_ProtocolViolation("Failed to query enabled status of channel")
 
     def _set_sweep_mode(self, mode):
-        if mode == oscilloscope.OscilloscopeSweepMode.AUTO:
+        if mode == OscilloscopeSweepMode.AUTO:
             self._scpi_command_noreply(":TRIG:SWE AUTO")
-        elif mode == oscilloscope.OscilloscopeSweepMode.NORMAL:
+        elif mode == OscilloscopeSweepMode.NORMAL:
             self._scpi_command_noreply(":TRIG:SWE NORM")
-        elif mode == oscilloscope.OscilloscopeSweepMode.SINGLE:
+        elif mode == OscilloscopeSweepMode.SINGLE:
             self._scpi_command_noreply(":TRIG:SWE SING")
         else:
             raise ValueError(f"Unknown sweep mode {mode} passed")
@@ -218,9 +218,9 @@ class MSO5000(oscilloscope.Oscilloscope):
         resp = self._scpi_command(f":TRIG:SWE?")
 
         modes = {
-            "NORM" : oscilloscope.OscilloscopeSweepMode.NORMAL,
-            "SING" : oscilloscope.OscilloscopeSweepMode.SINGLE,
-            "AUTO" : oscilloscope.OscilloscopeSweepMode.AUTO
+            "NORM" : OscilloscopeSweepMode.NORMAL,
+            "SING" : OscilloscopeSweepMode.SINGLE,
+            "AUTO" : OscilloscopeSweepMode.AUTO
         }
         if resp in modes:
             return modes[resp]
@@ -229,20 +229,20 @@ class MSO5000(oscilloscope.Oscilloscope):
 
 
     def _set_trigger_mode(self, mode):
-        if mode == oscilloscope.OscilloscopeTriggerMode.EDGE:
+        if mode == OscilloscopeTriggerMode.EDGE:
             self._scpi_command_noreply(":TRIG:MODE EDGE")
-        elif mode == oscilloscope.OscilloscopeTriggerMode.PULSE:
+        elif mode == OscilloscopeTriggerMode.PULSE:
             self._scpi_command_noreply(":TRIG:MODE PULS")
-        elif mode == oscilloscope.OscilloscopeTriggerMode.SLOPE:
+        elif mode == OscilloscopeTriggerMode.SLOPE:
             self._scpi_command_noreply(":TRIG:MODE SLOP")
 
     def _get_trigger_mode(self):
         resp = self._scpi_command(f":TRIG:MODE?")
 
         modes = {
-            "EDGE" : oscilloscope.OscilloscopeTriggerMode.EDGE,
-            "PULS" : oscilloscope.OscilloscopeTriggerMode.PULSE,
-            "SLOP" : oscilloscope.OscilloscopeTriggerMode.SLOPE
+            "EDGE" : OscilloscopeTriggerMode.EDGE,
+            "PULS" : OscilloscopeTriggerMode.PULSE,
+            "SLOP" : OscilloscopeTriggerMode.SLOPE
         }
         if resp in modes:
             return modes[resp]
@@ -253,28 +253,28 @@ class MSO5000(oscilloscope.Oscilloscope):
         self._scpi_command_noreply(":TFOR")
 
     def _set_run_mode(self, mode):
-        if mode == oscilloscope.OscilloscopeRunMode.STOP:
+        if mode == OscilloscopeRunMode.STOP:
             self._scpi_command_noreply(":STOP")
-        elif mode == oscilloscope.OscilloscopeRunMode.SINGLE:
+        elif mode == OscilloscopeRunMode.SINGLE:
             self._scpi_command_noreply(":SING")
-        elif mode == oscilloscope.OscilloscopeRunMode.RUN:
+        elif mode == OscilloscopeRunMode.RUN:
             self._scpi_command_noreply(":RUN")
 
     def _get_run_mode(self, mode):
         resp = self._scpi_command(":TRIG:STAT?")
 
         if resp == "STOP":
-            return oscilloscope.OscilloscopeRunMode.STOP
+            return OscilloscopeRunMode.STOP
         elif (resp == "RUN") or (resp == "AUTO"):
-            return oscilloscope.OscilloscopeRunMode.RUN
+            return OscilloscopeRunMode.RUN
         elif resp == "WAIT":
-            return oscilloscope.OscilloscopeRunMode.RUN
+            return OscilloscopeRunMode.RUN
 
     def _set_timebase_mode(self, mode):
         modestr = {
-            oscilloscope.OscilloscopeTimebaseMode.MAIN : "MAIN",
-            oscilloscope.OscilloscopeTimebaseMode.XY   : "XY",
-            oscilloscope.OscilloscopeTimebaseMode.ROLL : "ROLL"
+            OscilloscopeTimebaseMode.MAIN : "MAIN",
+            OscilloscopeTimebaseMode.XY   : "XY",
+            OscilloscopeTimebaseMode.ROLL : "ROLL"
         }
 
         if mode not in modestr:
@@ -286,9 +286,9 @@ class MSO5000(oscilloscope.Oscilloscope):
         resp = self._scpi_command(f":TIM:MODE?")
 
         modes = {
-            "MAIN" : oscilloscope.OscilloscopeTimebaseMode.MAIN,
-            "XY"   : oscilloscope.OscilloscopeTimebaseMode.XY,
-            "ROLL" : oscilloscope.OscilloscopeTimebaseMode.ROLL
+            "MAIN" : OscilloscopeTimebaseMode.MAIN,
+            "XY"   : OscilloscopeTimebaseMode.XY,
+            "ROLL" : OscilloscopeTimebaseMode.ROLL
         }
         if resp in modes:
             return modes[resp]
@@ -308,7 +308,7 @@ class MSO5000(oscilloscope.Oscilloscope):
             "MSO5074" : (5e-9, 1000)
         }
 
-        if self._get_timebase_mode() == oscilloscope.OscilloscopeTimebaseMode.ROLL:
+        if self._get_timebase_mode() == OscilloscopeTimebaseMode.ROLL:
             if (scale < 200e-3) or (scale > 1000.0):
                 raise ValueError("Timebase values in roll mode have to be in range 200ms to 1ks")
         else:
@@ -336,9 +336,9 @@ class MSO5000(oscilloscope.Oscilloscope):
             raise ValueError(f"Supplied channel number {channel} is out of bounds")
 
         modestr = {
-            oscilloscope.OscilloscopeCouplingMode.DC  : "DC",
-            oscilloscope.OscilloscopeCouplingMode.AC  : "AC",
-            oscilloscope.OscilloscopeCouplingMode.GND : "GND"
+            OscilloscopeCouplingMode.DC  : "DC",
+            OscilloscopeCouplingMode.AC  : "AC",
+            OscilloscopeCouplingMode.GND : "GND"
         }
 
         if mode not in modestr:
@@ -353,9 +353,9 @@ class MSO5000(oscilloscope.Oscilloscope):
         resp = self._scpi_command(f":CHAN{channel+1}:COUP?")
 
         modes = {
-            "DC"   : oscilloscope.OscilloscopeCouplingMode.DC,
-            "AC"   : oscilloscope.OscilloscopeCouplingMode.AC,
-            "GND"  : oscilloscope.OscilloscopeCouplingMode.GND
+            "DC"   : OscilloscopeCouplingMode.DC,
+            "AC"   : OscilloscopeCouplingMode.AC,
+            "GND"  : OscilloscopeCouplingMode.GND
         }
         if resp in modes:
             return modes[resp]
@@ -435,7 +435,7 @@ class MSO5000(oscilloscope.Oscilloscope):
         #	Reference time (should be 0)
         return xinc, xorigin, xref
 
-    def _query_waveform(self, channel)
+    def _query_waveform(self, channel):
         if (channel < 0) or (channel > self._nchannels):
             raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels}]")
         self._scpi_command_noreply(f":WAV:SOUR CHAN{channel}")
@@ -476,8 +476,8 @@ class MSO5000(oscilloscope.Oscilloscope):
         # Build x axis ...
         if self._use_numpy:
             import numpy as np
-            xdata = np.arange(xorigin, xorigin + points * xinc, xinc)
-			ydata = np.asarray(wavedata)
+            xdata = np.arange(xorigin, xorigin + points * xinc - 1e-9, xinc)
+            ydata = np.asarray(wavedata)
         else:
             xdata = []
             curx = xorigin
@@ -498,19 +498,13 @@ class MSO5000(oscilloscope.Oscilloscope):
         return res
 
 if __name__ == "__main__":
-    with MSO5000(address = "10.0.0.122") as mso:
+    with MSO5000(address = "10.0.0.123", useNumpy = True) as mso:
         print(f"Identify: {mso.identify()}")
 
-        sleep(3)
-        mso.set_run_mode(oscilloscope.OscilloscopeRunMode.SINGLE)
-        sleep(5)
-        mso.force_trigger()
-        sleep(5)
-        mso.set_run_mode(oscilloscope.OscilloscopeRunMode.SINGLE)
-        sleep(5)
-        mso.force_trigger()
-        sleep(5)
-        mso.set_run_mode(oscilloscope.OscilloscopeRunMode.RUN)
-        sleep(2)
+        chr1 = mso._query_waveform(1)
+
+        import matplotlib.pyplot as plt
+        plt.plot(chr1['x'], chr1['y'])
+        plt.show()
 
         pass
