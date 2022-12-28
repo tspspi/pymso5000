@@ -541,20 +541,3 @@ class MSO5000(Oscilloscope):
         }
 
         return res
-
-if __name__ == "__main__":
-    with MSO5000(address = "10.0.0.123", useNumpy = True) as mso:
-        print(f"Identify: {mso.identify()}")
-
-        mso._set_channel_enable(1, True)
-        mso._set_channel_enable(2, True)
-
-        data = mso._query_waveform((1, 2))
-        print(data)
-
-        import matplotlib.pyplot as plt
-        plt.plot(data['x'], data['y1'], label = "Ch1")
-        plt.plot(data['x'], data['y2'], label = "Ch2")
-        plt.show()
-
-        pass
