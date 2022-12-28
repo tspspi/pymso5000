@@ -51,6 +51,7 @@ class MSO5000(Oscilloscope):
                 OscilloscopeRunMode.SINGLE
             ],
             timebaseScale = (5e-9, 1000.0),
+			voltageScale = (500e-6, 10),
             triggerForceSupported = True
         )
 
@@ -385,7 +386,37 @@ class MSO5000(Oscilloscope):
             raise CommunicationError_ProtocolViolation(f"Received unsupported probe ratio {resp}")
         return resp
 
+    def _set_channel_scale(self, channel, scale):
+        if (channel < 0) or (channel > 3):
+            raise ValueError(f"Supplied channel number {channel} is out of bounds")
+        scale = float(scale)
 
+        # Check it's a scale that's actually setable - one has to also look at channel probe ratio though ...
+        setableScales = [ 500e-6, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 1e-1, 2e-1, 5e-1, 1, 2, 5, 10 ]
+
+        currentProbeRatio = self._get_channel_probe_ratio(channel)
+        if currentProbeRatio is None:
+            raise CommunicationError_ProtocolViolation("Failed to query current probe ratio")
+        scale = scale / currentProbeRatio
+        if scale not in setableScales:
+            raise ValueError("Scale out of range [{500e-6 * currentProbeRatio};{10 * currentProbeRatio}] ({currentProbeRatio}x probe selected) in 1,2,5 steps")
+
+        self._scpi_command_noreply(f":CHAN{channel+1}:SCAL {scale}")
+
+    def _get_channel_scale(self, channel):
+        if (channel < 0) or (channel > 3):
+            raise ValueError(f"Supplied channel number {channel} is out of bounds")
+        resp = self._scpi_command(f":CHAN{channel+1}:SCAL?")
+        try:
+            resp = float(resp)
+        except:
+            return None
+
+        scalefactor = self._get_channel_probe_ratio(self, channel)
+        if scalefactor is None:
+            raise CommunicationError_ProtocolViolation("Failed to query current probe ratio")
+
+        return resp * scalefactor
 
     def _waveform_get_xscale(self):
         xinc = self._scpi_command(":WAV:XINC?")
