@@ -481,9 +481,9 @@ class MSO5000(Oscilloscope):
                     resp[f"y{ch-1}"] = resp_next['y']
             return resp
 
-        if (channel < 0) or (channel > self._nchannels):
-            raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels}]")
-        self._scpi_command_noreply(f":WAV:SOUR CHAN{channel}")
+        if (channel < 0) or (channel >= self._nchannels):
+            raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels-1}]")
+        self._scpi_command_noreply(f":WAV:SOUR CHAN{channel-1}")
         self._scpi_command_noreply(f":WAV:MODE NORM")
         self._scpi_command_noreply(f":WAV:FORM ASCII")
         self._scpi_command_noreply(f":WAV:POIN 1000")
