@@ -466,7 +466,7 @@ class MSO5000(Oscilloscope):
         #	Reference time (should be 0)
         return xinc, xorigin, xref
 
-    def _query_waveform(self, channel):
+    def _query_waveform(self, channel, stats = None):
         if isinstance(channel, list) or isinstance(channel, tuple):
             resp = None
 
@@ -475,10 +475,10 @@ class MSO5000(Oscilloscope):
                 if resp is None:
                     resp = {
                         'x' : resp_next['x'],
-                        f"y{ch}" : resp_next['y']
+                        f"y{ch-1}" : resp_next['y']
                     }
                 else:
-                    resp[f"y{ch}"] = resp_next['y']
+                    resp[f"y{ch-1}"] = resp_next['y']
             return resp
 
         if (channel < 0) or (channel > self._nchannels):
