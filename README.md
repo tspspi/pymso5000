@@ -2,7 +2,7 @@
 
 A simple Python library and utility to control and query data from
 Rigol MSO5xxx oscilloscopes (not supporting all features of the oscilloscope,
-work in progress). This library implements the [Oscilloscope] class from
+work in progress). This library implements the [Oscilloscope](https://github.com/tspspi/pylabdevs/blob/master/src/labdevices/oscilloscope.py) class from
 the [pylabdevs](https://github.com/tspspi/pylabdevs) package which
 exposes the public interface.
 
