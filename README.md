@@ -101,3 +101,14 @@ More documentation in progress ...
 * ```get_channel_scale(channel)```
 * ```query_waveform(channel, stats = None)```
 * ```off()```
+
+## CLI fetching utility
+
+This package comes with a ```mso5000fetch``` command line utility. This utility
+allows one to simply fetch one or more traces and store them either inside an npz
+or a matplotlib plot. In addition it can run all of the ```pylabdevs``` statistics
+functions (currently no plot, only stored in the npz) and execute manually assisted
+differential scans.
+
+Help for this utility is available via ```mso5000fetch --help```
+
