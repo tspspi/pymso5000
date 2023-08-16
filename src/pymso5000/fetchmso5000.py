@@ -205,6 +205,9 @@ def main():
                     # Store npz
                     np.savez(fname, data = data, background = dataBG, diffdata = dataDiff)
                     logger.info(f"Stored {fname}")
+        else:
+            # Always plot if we don't write output files ...
+            doPlot = True
 
         if doPlot:
             # Determine the scaling factors for all data ...
@@ -292,7 +295,7 @@ def main():
                         plt.savefig(fname)
                         logger.info(f"Written plot {fname}")
 
-            if args.show:
+            if args.show or (args.out is None):
                 plt.show()
                 
 
