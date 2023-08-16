@@ -521,12 +521,15 @@ class MSO5000(Oscilloscope):
         # Build x axis ...
         if self._use_numpy:
             import numpy as np
-            xdata = np.arange(xorigin, xorigin + points * xinc - 1e-9, xinc)
+            dpoints = len(wavedata)
+            #xdata = np.arange(xorigin, xorigin + dpoints * xinc - 1e-9, xinc)
+            xdata = np.linspace(xorigin, xorigin + dpoints * xinc, dpoints)
             ydata = np.asarray(wavedata)
         else:
             xdata = []
             curx = xorigin
-            for i in range(points):
+            dpoints = len(wavedata)
+            for i in range(dpoints):
                 xdata.append(curx)
                 curx = curx + xinc
             ydata = wavedata
