@@ -1,5 +1,7 @@
 # Rigol MSO5xxx oscilloscope Python library (unofficial)
 
+![A Rigol MSO5074 in a physics laboratory](https://raw.githubusercontent.com/tspspi/pymso5000/master/doc/msophoto.png)
+
 A simple Python library and utility to control and query data from
 Rigol MSO5xxx oscilloscopes (not supporting all features of the oscilloscope,
 work in progress). This library implements the [Oscilloscope](https://github.com/tspspi/pylabdevs/blob/master/src/labdevices/oscilloscope.py) class from
