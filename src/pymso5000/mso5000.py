@@ -3,6 +3,7 @@ from labdevices.exceptions import CommunicationError_Timeout
 from labdevices.exceptions import CommunicationError_NotConnected
 
 from labdevices.oscilloscope import Oscilloscope, OscilloscopeSweepMode, OscilloscopeTriggerMode, OscilloscopeTimebaseMode, OscilloscopeRunMode
+from labdevices.scpi import SCPIDeviceEthernet
 import atexit
 
 from time import sleep
@@ -21,12 +22,7 @@ class MSO5000(Oscilloscope):
 
         useNumpy = False
     ):
-        if not isinstance(address, str):
-            raise ValueError(f"Address {address} is invalid")
-        if not isinstance(port, int):
-            raise ValueError(f"Port {port} is invalid")
-        if (port < 0) or (port > 65535):
-            raise ValueError(f"Port {port} is invalid")
+        self._scpi = SCPIDeviceEthernet(address, port, None)
 
         super().__init__(
             nChannels = 4,
@@ -55,11 +51,6 @@ class MSO5000(Oscilloscope):
             triggerForceSupported = True
         )
 
-        self._socket = None
-
-        self._address = address
-        self._port = port
-
         self._probe_ratios = [ 1, 1, 1, 1 ]
 
         self._use_numpy = useNumpy
@@ -69,21 +60,7 @@ class MSO5000(Oscilloscope):
     # Connection handling
 
     def _connect(self, address = None, port = None):
-        if self._socket is None:
-            if address is not None:
-                if not isinstance(address, str):
-                    raise ValueError(f"Address {address} is invalid")
-                self._address = address
-            if port is not None:
-                if not isinstance(port, int):
-                    raise ValueError(f"Port {port} is invalid")
-                if (port <= 0) or (port > 65535):
-                    raise ValueError(f"Port {port} is invalid")
-                self._port = port
-
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._socket.connect((self._address, self._port))
-
+        if self._scpi.connect(address, port):
             # Ask for identity and verify ...
             idnString = self._idn()
             if not idnString.startswith("RIGOL TECHNOLOGIES,MSO50"):
@@ -100,16 +77,10 @@ class MSO5000(Oscilloscope):
         return True
 
     def _disconnect(self):
-        if self._socket is not None:
-            self._socket.shutdown(socket.SHUT_RDWR)
-            self._socket.close()
-            self._socket = None
+        self._scpi.disconnect()
 
     def _isConnected(self):
-        if self._socket is not None:
-            return True
-        else:
-            return False
+        return self._scpi.isConnected()
 
     # Context management
 
@@ -127,42 +98,14 @@ class MSO5000(Oscilloscope):
         self._usesContext = False
     def __close(self):
         atexit.unregister(self.__close)
-        if self._socket is not None:
+        if self._scpi.isConnected():
             self._off()
             self._disconnect()
-
-    # SCPI queries and responses
-
-    def _scpi_command(self, command):
-        if not self._isConnected():
-            raise CommunicationError_NotConnected("Device is not connected")
-
-        self._socket.sendall((command + "\n").encode())
-        readData = ""
-
-        # ToDo: Implement timeout handling ...
-        while True:
-            dataBlock = self._socket.recv(4096*10)
-            dataBlockStr = dataBlock.decode("utf-8")
-            readData = readData + dataBlockStr
-            if dataBlockStr[-1] == '\n':
-                break
-
-        return readData.strip()
-
-    def _scpi_command_noreply(self, command):
-        if not self._isConnected():
-            raise CommunicationError_NotConnected("Device is not connected")
-
-        self._socket.sendall((command+"\n").encode())
-        return
 
     # Commands
 
     def _idn(self):
-        if self._isConnected():
-            return self._scpi_command("*IDN?")
-        return False
+        return self._scpi.scpiQuery("*IDN?")
 
     def _identify(self):
         resp = self._idn()
@@ -185,15 +128,15 @@ class MSO5000(Oscilloscope):
         if (channel < 0) or (channel > 3):
             raise ValueError("Invalid channel number for MSO5000")
         if enabled:
-            self._scpi_command_noreply(f":CHAN{channel+1}:DISP ON")
+            self._scpi.scpiCommand(f":CHAN{channel+1}:DISP ON")
         else:
-            self._scpi_command_noreply(f":CHAN{channel+1}:DISP OFF")
+            self._scpi.scpiCommand(f":CHAN{channel+1}:DISP OFF")
 
     def _is_channel_enabled(self, channel):
         if (channel < 0) or (channel > 3):
             raise ValueError("Invalid channel number for MSO5000")
 
-        resp = self._scpi_command(f":CHAN{channel+1}:DISP?")
+        resp = self._scpi.scpiQuery(f":CHAN{channel+1}:DISP?")
         try:
             resp = int(resp)
             if resp == 1:
@@ -207,16 +150,16 @@ class MSO5000(Oscilloscope):
 
     def _set_sweep_mode(self, mode):
         if mode == OscilloscopeSweepMode.AUTO:
-            self._scpi_command_noreply(":TRIG:SWE AUTO")
+            self._scpi.scpiCommand(":TRIG:SWE AUTO")
         elif mode == OscilloscopeSweepMode.NORMAL:
-            self._scpi_command_noreply(":TRIG:SWE NORM")
+            self._scpi.scpiCommand(":TRIG:SWE NORM")
         elif mode == OscilloscopeSweepMode.SINGLE:
-            self._scpi_command_noreply(":TRIG:SWE SING")
+            self._scpi.scpiCommand(":TRIG:SWE SING")
         else:
             raise ValueError(f"Unknown sweep mode {mode} passed")
 
     def _get_sweep_mode(self):
-        resp = self._scpi_command(f":TRIG:SWE?")
+        resp = self._scpi.scpiCommand(f":TRIG:SWE?")
 
         modes = {
             "NORM" : OscilloscopeSweepMode.NORMAL,
@@ -231,14 +174,14 @@ class MSO5000(Oscilloscope):
 
     def _set_trigger_mode(self, mode):
         if mode == OscilloscopeTriggerMode.EDGE:
-            self._scpi_command_noreply(":TRIG:MODE EDGE")
+            self._scpi.scpiCommand(":TRIG:MODE EDGE")
         elif mode == OscilloscopeTriggerMode.PULSE:
-            self._scpi_command_noreply(":TRIG:MODE PULS")
+            self._scpi.scpiCommand(":TRIG:MODE PULS")
         elif mode == OscilloscopeTriggerMode.SLOPE:
-            self._scpi_command_noreply(":TRIG:MODE SLOP")
+            self._scpi.scpiCommand(":TRIG:MODE SLOP")
 
     def _get_trigger_mode(self):
-        resp = self._scpi_command(f":TRIG:MODE?")
+        resp = self._scpi.scpiQuery(f":TRIG:MODE?")
 
         modes = {
             "EDGE" : OscilloscopeTriggerMode.EDGE,
@@ -251,18 +194,18 @@ class MSO5000(Oscilloscope):
             raise CommunicationError_ProtocolViolation(f"Unknown trigger mode {resp} received from device")
 
     def _force_trigger(self):
-        self._scpi_command_noreply(":TFOR")
+        self._scpi.scpiCommand(":TFOR")
 
     def _set_run_mode(self, mode):
         if mode == OscilloscopeRunMode.STOP:
-            self._scpi_command_noreply(":STOP")
+            self._scpi.scpiCommand(":STOP")
         elif mode == OscilloscopeRunMode.SINGLE:
-            self._scpi_command_noreply(":SING")
+            self._scpi.scpiCommand(":SING")
         elif mode == OscilloscopeRunMode.RUN:
-            self._scpi_command_noreply(":RUN")
+            self._scpi.scpiCommand(":RUN")
 
     def _get_run_mode(self, mode):
-        resp = self._scpi_command(":TRIG:STAT?")
+        resp = self._scpi.scpiQuery(":TRIG:STAT?")
 
         if resp == "STOP":
             return OscilloscopeRunMode.STOP
@@ -281,10 +224,10 @@ class MSO5000(Oscilloscope):
         if mode not in modestr:
             raise ValueError(f"Unsupported timebase mode {mode}")
 
-        self._scpi_command_noreply(f":TIM:MODE {modestr[mode]}")
+        self._scpi.scpiCommand(f":TIM:MODE {modestr[mode]}")
 
     def _get_timebase_mode(self):
-        resp = self._scpi_command(f":TIM:MODE?")
+        resp = self._scpi.scpiQuery(f":TIM:MODE?")
 
         modes = {
             "MAIN" : OscilloscopeTimebaseMode.MAIN,
@@ -320,10 +263,10 @@ class MSO5000(Oscilloscope):
                 raise ValueError(f"Timebase scale {scale}s/div is out of range {tbLimitsYT[self._id['product']][0]}s/div to {tbLimitsYT[self._id['product']][1]}s/div for {self._id['product']}")
 
         # Set timebase
-        self._scpi_command_noreply(f":TIM:SCAL {scale}")
+        self._scpi.scpiCommand(f":TIM:SCAL {scale}")
 
     def _get_timebase_scale(self):
-        resp = self._scpi_command(":TIM:SCAL?")
+        resp = self._scpi.scpiQuery(":TIM:SCAL?")
         try:
             resp = float(resp)
             return resp
@@ -345,13 +288,13 @@ class MSO5000(Oscilloscope):
         if mode not in modestr:
             raise ValueError(f"Unsupported coupling mode {mode}")
 
-        self._scpi_command_noreply(f":CHAN{channel+1}:COUP {modestr[mode]}")
+        self._scpi.scpiCommand(f":CHAN{channel+1}:COUP {modestr[mode]}")
 
     def _get_channel_coupling(self, channel):
         if (channel < 0) or (channel > 3):
             raise ValueError(f"Supplied channel number {channel} is out of bounds")
 
-        resp = self._scpi_command(f":CHAN{channel+1}:COUP?")
+        resp = self._scpi.scpiQuery(f":CHAN{channel+1}:COUP?")
 
         modes = {
             "DC"   : OscilloscopeCouplingMode.DC,
@@ -370,12 +313,12 @@ class MSO5000(Oscilloscope):
             raise ValueError(f"Ratio {ratio} is not supported by this device")
 
         self._probe_ratios[channel] = ratio
-        self._scpi_command_noreply(f":CHAN{channel+1}:PROB {ratio}")
+        self._scpi.scpiCommand(f":CHAN{channel+1}:PROB {ratio}")
 
     def _get_channel_probe_ratio(self, channel):
         if (channel < 0) or (channel > 3):
             raise ValueError(f"Supplied channel number {channel} is out of bounds")
-        resp = self._scpi_command(f":CHAN{channel+1}:PROB?")
+        resp = self._scpi.scpiQuery(f":CHAN{channel+1}:PROB?")
 
         try:
             resp = float(resp)
@@ -401,12 +344,12 @@ class MSO5000(Oscilloscope):
         if scale not in setableScales:
             raise ValueError("Scale out of range [{500e-6 * currentProbeRatio};{10 * currentProbeRatio}] ({currentProbeRatio}x probe selected) in 1,2,5 steps")
 
-        self._scpi_command_noreply(f":CHAN{channel+1}:SCAL {scale}")
+        self._scpi.scpiCommand(f":CHAN{channel+1}:SCAL {scale}")
 
     def _get_channel_scale(self, channel):
         if (channel < 0) or (channel > 3):
             raise ValueError(f"Supplied channel number {channel} is out of bounds")
-        resp = self._scpi_command(f":CHAN{channel+1}:SCAL?")
+        resp = self._scpi.scpiQuery(f":CHAN{channel+1}:SCAL?")
         try:
             resp = float(resp)
         except:
@@ -419,13 +362,13 @@ class MSO5000(Oscilloscope):
         return resp * scalefactor
 
     def _waveform_get_xscale(self):
-        xinc = self._scpi_command(":WAV:XINC?")
+        xinc = self._scpi.scpiQuery(":WAV:XINC?")
         if xinc is None:
             raise CommunicationError_ProtocolViolation("Did not receive valid response to XINC")
-        xorigin = self._scpi_command(":WAV:XOR?")
+        xorigin = self._scpi.scpiQuery(":WAV:XOR?")
         if xorigin is None:
             raise CommunicationError_ProtocolViolation("Did not receive valid response to XORIGIN")
-        xref = self._scpi_command(":WAV:XREF?")
+        xref = self._scpi.scpiQuery(":WAV:XREF?")
         if xref is None:
             raise CommunicationError_ProtocolViolation("Did not receive valid response to XREF")
 
@@ -443,13 +386,13 @@ class MSO5000(Oscilloscope):
         return xinc, xorigin, xref
 
     def _waveform_get_yscale(self):
-        xinc = self._scpi_command(":WAV:YINC?")
+        xinc = self._scpi.scpiQuery(":WAV:YINC?")
         if xinc is None:
             raise CommunicationError_ProtocolViolation("Did not receive valid response to YINC")
-        xorigin = self._scpi_command(":WAV:YOR?")
+        xorigin = self._scpi.scpiQuery(":WAV:YOR?")
         if xorigin is None:
             raise CommunicationError_ProtocolViolation("Did not receive valid response to YORIGIN")
-        xref = self._scpi_command(":WAV:YREF?")
+        xref = self._scpi.scpiQuery(":WAV:YREF?")
         if xref is None:
             raise CommunicationError_ProtocolViolation("Did not receive valid response to YREF")
 
@@ -483,12 +426,12 @@ class MSO5000(Oscilloscope):
 
         if (channel < 0) or (channel >= self._nchannels):
             raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels-1}]")
-        self._scpi_command_noreply(f":WAV:SOUR CHAN{channel+1}")
-        self._scpi_command_noreply(f":WAV:MODE NORM")
-        self._scpi_command_noreply(f":WAV:FORM ASCII")
-        self._scpi_command_noreply(f":WAV:POIN 1000")
-        resppre = self._scpi_command(":WAV:PRE?")
-        respdata = self._scpi_command(":WAV:DATA?")
+        self._scpi.scpiCommand(f":WAV:SOUR CHAN{channel+1}")
+        self._scpi.scpiCommand(f":WAV:MODE NORM")
+        self._scpi.scpiCommand(f":WAV:FORM ASCII")
+        self._scpi.scpiCommand(f":WAV:POIN 1000")
+        resppre = self._scpi.scpiQuery(":WAV:PRE?")
+        respdata = self._scpi.scpiQuery(":WAV:DATA?")
 
         if (resppre is None) or (respdata is None):
             raise CommunicationError_ProtocolViolation("Failed to query trace from MSO5000")
