@@ -20,9 +20,14 @@ class MSO5000(Oscilloscope):
         address=None,
         port=5555,
 
-        useNumpy = False
+        useNumpy = False,
+        
+        rawMode = False,     # Sets the number of samples to retrieve up to the current memory depth of the scope
+        samplePoints = 1000, 
     ):
         self._scpi = SCPIDeviceEthernet(address, port, None)
+        self._rawMode = rawMode
+        self._samplePoints = samplePoints
 
         super().__init__(
             nChannels = 4,
@@ -408,8 +413,15 @@ class MSO5000(Oscilloscope):
         #	Start time of currently selected point after trigger
         #	Reference time (should be 0)
         return xinc, xorigin, xref
+    
+    def _get_num_points(self):
+        resp = self._scpi.scpiQuery(":WAV:POIN?")
+        return resp     
 
     def _query_waveform(self, channel, stats = None):
+        """ When raw mode is enabled, the number of points is set by the scope's memory depth setting
+            This will generally take significantly longer as the memroy depth is much larger """
+
         if isinstance(channel, list) or isinstance(channel, tuple):
             resp = None
 
@@ -423,13 +435,17 @@ class MSO5000(Oscilloscope):
                 else:
                     resp[f"y{ch}"] = resp_next['y']
             return resp
-
+        
         if (channel < 0) or (channel >= self._nchannels):
             raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels-1}]")
+        if self._rawMode:
+            self._scpi.scpiCommand(f":WAV:MODE RAW")
+            self._scpi.scpiCommand(f":WAV:POIN RAW")
+        else:
+            self._scpi.scpiCommand(f":WAV:MODE NORM")
+            self._scpi.scpiCommand(f":WAV:POIN {self._samplePoints} NORM")
         self._scpi.scpiCommand(f":WAV:SOUR CHAN{channel+1}")
-        self._scpi.scpiCommand(f":WAV:MODE NORM")
         self._scpi.scpiCommand(f":WAV:FORM ASCII")
-        self._scpi.scpiCommand(f":WAV:POIN 1000")
         resppre = self._scpi.scpiQuery(":WAV:PRE?")
         respdata = self._scpi.scpiQuery(":WAV:DATA?")
 
@@ -443,8 +459,8 @@ class MSO5000(Oscilloscope):
 
         if int(pre[0]) != 2:
             raise CommunicationError_ProtocolViolation(f"Requested ASCII but received format {pre[0]}")
-        if int(pre[1]) != 0:
-            raise CommunicationError_ProtocolViolation(f"Requested NORMAL data but received {pre[1]}")
+        if (int(pre[1]) != 0) and (int(pre[1]) != 2):
+            raise CommunicationError_ProtocolViolation(f"Requested Normal(0)/Raw(2) data, but received {pre[1]}")
         points = int(pre[2])
         avgcount = int(pre[3])
         xinc = float(pre[4])
@@ -487,3 +503,4 @@ class MSO5000(Oscilloscope):
         }
 
         return res
+
