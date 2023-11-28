@@ -420,7 +420,7 @@ class MSO5000(Oscilloscope):
 
     def _query_waveform(self, channel, stats = None):
         """ When raw mode is enabled, the number of points is set by the scope's memory depth setting
-            This will generally take significantly longer as the memroy depth is much larger """
+            This will generally take significantly longer as the memory depth is much larger """
 
         if isinstance(channel, list) or isinstance(channel, tuple):
             resp = None
