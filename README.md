@@ -24,10 +24,10 @@ from pymso5000.mso5000 import MSO5000
 with MSO5000(address = "10.0.0.123") as mso:
    print(f"Identify: {mso.identify()}")
 
+   mso.set_channel_enable(0, True)
    mso.set_channel_enable(1, True)
-   mso.set_channel_enable(2, True)
 
-   data = mso.query_waveform((1, 2))
+   data = mso.query_waveform((0, 1))
    print(data)
 
    import matplotlib.pyplot as plt
