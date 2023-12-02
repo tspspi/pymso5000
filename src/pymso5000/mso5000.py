@@ -68,7 +68,7 @@ class MSO5000(Oscilloscope):
         if self._scpi.connect(address, port):
             # Ask for identity and verify ...
             idnString = self._idn()
-            if not idnString.startswith("RIGOL TECHNOLOGIES,MSO50"):
+            if not idnString.startswith("RIGOL TECHNOLOGIES,MSO5"):
                 self._disconnect()
                 raise ValueError(f"Unsupported device, identifies as {idnString}")
 
@@ -209,7 +209,7 @@ class MSO5000(Oscilloscope):
         elif mode == OscilloscopeRunMode.RUN:
             self._scpi.scpiCommand(":RUN")
 
-    def _get_run_mode(self, mode):
+    def _get_run_mode(self):
         resp = self._scpi.scpiQuery(":TRIG:STAT?")
 
         if resp == "STOP":
@@ -218,7 +218,7 @@ class MSO5000(Oscilloscope):
             return OscilloscopeRunMode.RUN
         elif resp == "WAIT":
             return OscilloscopeRunMode.RUN
-
+            
     def _set_timebase_mode(self, mode):
         modestr = {
             OscilloscopeTimebaseMode.MAIN : "MAIN",
@@ -420,7 +420,7 @@ class MSO5000(Oscilloscope):
 
     def _query_waveform(self, channel, stats = None):
         """ When raw mode is enabled, the number of points is set by the scope's memory depth setting
-            This will generally take significantly longer as the memroy depth is much larger """
+            This will generally take significantly longer as the memory depth is much larger """
 
         if isinstance(channel, list) or isinstance(channel, tuple):
             resp = None
@@ -439,6 +439,8 @@ class MSO5000(Oscilloscope):
         if (channel < 0) or (channel >= self._nchannels):
             raise ValueError(f"Channel {channel} is out of range [0;{self._nchannels-1}]")
         if self._rawMode:
+            if self._get_run_mode() != OscilloscopeRunMode.STOP:
+                raise CommunicationError_ProtocolViolation("You must run OscilloscopeRunMode.STOP before capturing in raw mode")
             self._scpi.scpiCommand(f":WAV:MODE RAW")
             self._scpi.scpiCommand(f":WAV:POIN RAW")
         else:
