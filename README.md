@@ -8,6 +8,8 @@ work in progress). This library implements the [Oscilloscope](https://github.com
 the [pylabdevs](https://github.com/tspspi/pylabdevs) package which
 exposes the public interface.
 
+Patches for raw mode sample query by [MasterJubei](https://github.com/MasterJubei)
+
 ## Installing 
 
 There is a PyPi package that can be installed using
