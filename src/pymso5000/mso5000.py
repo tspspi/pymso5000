@@ -360,7 +360,7 @@ class MSO5000(Oscilloscope):
         except:
             return None
 
-        scalefactor = self._get_channel_probe_ratio(self, channel)
+        scalefactor = self._get_channel_probe_ratio(channel)
         if scalefactor is None:
             raise CommunicationError_ProtocolViolation("Failed to query current probe ratio")
 
