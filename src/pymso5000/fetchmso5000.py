@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-import datetime
 
 import argparse
 import logging
@@ -84,8 +83,8 @@ def loadConfigFile(cfname = ".config/mso5000.cfg"):
             cfg = json.load(cfgFile)
     except FileNotFoundError:
         return None
-    except JSONDecodeError as e:
-        print(f"Failed to load configuration file {cfgname}")
+    except json.JSONDecodeError as e:
+        print(f"Failed to load configuration file {cfgPath}")
         print(e)
         sys.exit(1)
 
@@ -230,14 +229,14 @@ def main():
                         newmax = np.max(dataDiff[f"y{ich}"])
                         newmin = np.min(dataDiff[f"y{ich}"])
                         maxYDval = np.max((newmax, np.abs(newmin), maxYDval))
-                sfYD, sfYDLabel = getScaleFactorAndPrefix(maxYDval)
+                sfYD, _ = getScaleFactorAndPrefix(maxYDval)
 
             sfX, sfXLabel = getScaleFactorAndPrefix(np.max(data["x"]))
 
             if args.noautoscale:
                 sfX, sfXLabel = 1, ""
                 sfY, sfYLabel = 1, ""
-                sfYD, sfYDLabel = 1, ""
+                sfYD, _ = 1, ""
 
             xlabel = "Time "
             ylabel = "Signal "

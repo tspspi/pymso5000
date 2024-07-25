@@ -1,17 +1,10 @@
 from labdevices.exceptions import CommunicationError_ProtocolViolation
-from labdevices.exceptions import CommunicationError_Timeout
-from labdevices.exceptions import CommunicationError_NotConnected
+#from labdevices.exceptions import CommunicationError_Timeout
+#from labdevices.exceptions import CommunicationError_NotConnected
 
-from labdevices.oscilloscope import Oscilloscope, OscilloscopeSweepMode, OscilloscopeTriggerMode, OscilloscopeTimebaseMode, OscilloscopeRunMode
+from labdevices.oscilloscope import Oscilloscope, OscilloscopeSweepMode, OscilloscopeTriggerMode, OscilloscopeTimebaseMode, OscilloscopeRunMode, OscilloscopeCouplingMode
 from labdevices.scpi import SCPIDeviceEthernet
 import atexit
-
-from time import sleep
-
-import socket
-
-import logging
-import datetime
 
 class MSO5000(Oscilloscope):
     def __init__(
@@ -164,7 +157,7 @@ class MSO5000(Oscilloscope):
             raise ValueError(f"Unknown sweep mode {mode} passed")
 
     def _get_sweep_mode(self):
-        resp = self._scpi.scpiCommand(f":TRIG:SWE?")
+        resp = self._scpi.scpiCommand(":TRIG:SWE?")
 
         modes = {
             "NORM" : OscilloscopeSweepMode.NORMAL,
@@ -186,7 +179,7 @@ class MSO5000(Oscilloscope):
             self._scpi.scpiCommand(":TRIG:MODE SLOP")
 
     def _get_trigger_mode(self):
-        resp = self._scpi.scpiQuery(f":TRIG:MODE?")
+        resp = self._scpi.scpiQuery(":TRIG:MODE?")
 
         modes = {
             "EDGE" : OscilloscopeTriggerMode.EDGE,
@@ -232,7 +225,7 @@ class MSO5000(Oscilloscope):
         self._scpi.scpiCommand(f":TIM:MODE {modestr[mode]}")
 
     def _get_timebase_mode(self):
-        resp = self._scpi.scpiQuery(f":TIM:MODE?")
+        resp = self._scpi.scpiQuery(":TIM:MODE?")
 
         modes = {
             "MAIN" : OscilloscopeTimebaseMode.MAIN,
@@ -441,13 +434,13 @@ class MSO5000(Oscilloscope):
         if self._rawMode:
             if self._get_run_mode() != OscilloscopeRunMode.STOP:
                 raise CommunicationError_ProtocolViolation("You must run OscilloscopeRunMode.STOP before capturing in raw mode")
-            self._scpi.scpiCommand(f":WAV:MODE RAW")
-            self._scpi.scpiCommand(f":WAV:POIN RAW")
+            self._scpi.scpiCommand(":WAV:MODE RAW")
+            self._scpi.scpiCommand(":WAV:POIN RAW")
         else:
-            self._scpi.scpiCommand(f":WAV:MODE NORM")
+            self._scpi.scpiCommand(":WAV:MODE NORM")
             self._scpi.scpiCommand(f":WAV:POIN {self._samplePoints} NORM")
         self._scpi.scpiCommand(f":WAV:SOUR CHAN{channel+1}")
-        self._scpi.scpiCommand(f":WAV:FORM ASCII")
+        self._scpi.scpiCommand(":WAV:FORM ASCII")
         resppre = self._scpi.scpiQuery(":WAV:PRE?")
         respdata = self._scpi.scpiQuery(":WAV:DATA?")
 
@@ -463,14 +456,14 @@ class MSO5000(Oscilloscope):
             raise CommunicationError_ProtocolViolation(f"Requested ASCII but received format {pre[0]}")
         if (int(pre[1]) != 0) and (int(pre[1]) != 2):
             raise CommunicationError_ProtocolViolation(f"Requested Normal(0)/Raw(2) data, but received {pre[1]}")
-        points = int(pre[2])
-        avgcount = int(pre[3])
+        #points = int(pre[2])
+        #avgcount = int(pre[3])
         xinc = float(pre[4])
         xorigin = float(pre[5])
-        xref = float(pre[6])
-        yinc = float(pre[7])
-        yorigin = float(pre[8])
-        yref = float(pre[9])
+        #xref = float(pre[6])
+        #yinc = float(pre[7])
+        #yorigin = float(pre[8])
+        #yref = float(pre[9])
 
         # Parse data ...
         if respdata[0:2] != '#9':
